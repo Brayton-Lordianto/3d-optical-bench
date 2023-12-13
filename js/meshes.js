@@ -9,23 +9,26 @@ let sphere = (nu, nv) => createMesh(nu, nv, (u,v) => {
     return [ x,y,z, x,y,z, 1 ];
  });
 
-
 let createMesh = (nu, nv, p) => {
-let mesh = [];
-for (let j = nv ; j > 0 ; j--) {
-    for (let i = 0 ; i <= nu ; i++)
-        mesh.push(p(i/nu,j/nv), p(i/nu,j/nv-1/nv));
-    mesh.push(p(1,j/nv-1/nv), p(0,j/nv-1/nv));
-}
-return mesh.flat();
+    let mesh = [];
+    for (let j = nv ; j > 0 ; j--) {
+        for (let i = 0 ; i <= nu ; i++)
+            mesh.push(p(i/nu,j/nv), p(i/nu,j/nv-1/nv));
+        mesh.push(p(1,j/nv-1/nv), p(0,j/nv-1/nv));
+    }
+    return mesh.flat();
 }
 
+// vNor and vApplyTransform is not used in the screen
+let screen = [
+    -1, 1, 0,     0,0,0,0,
+     1, 1, 0,     0,0,0,0,
+    -1,-1, 0,     0,0,0,0,
+     1,-1, 0,     0,0,0,0,
+]                  
 
 let meshData = [
-// {
-//     type: 1, color: [1.,.1,.1],
-//     mesh: new Float32Array([-1, 1, 0, 1, 1, 0, -1, -1, 0, 1, -1, 0])
-// }, 
+{ type: 1, color: [1.,.1,.1], mesh: new Float32Array(screen) }, 
 { type: 1, color: [1.,.1,.1], mesh: new Float32Array(sphere(20, 10)) },
 ];
 

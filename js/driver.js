@@ -105,12 +105,13 @@ function driverScript() {
 
         // RENDER THE FRAME
         let m = mIdentity();
-        m = mScale(.16, .16, .16, m);
-
         
-
-
+        
+        
+        
         for (let n = 0; n < meshData.length; n++) {
+            if (n == 1) { m = mScale(.16, .16, .16, m); }
+            else { m = mScale(1, 1, 1, m); }
             gl.uniform3fv      (uColor    , meshData[n].color);
             gl.uniformMatrix4fv(uMatrix   , false, m);
             gl.uniformMatrix4fv(uInvMatrix, false, mInverse(m));
