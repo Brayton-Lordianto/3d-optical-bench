@@ -129,6 +129,50 @@ vec3 normalizeDirection(vec3 direction) {
     return normalizedDirection;
 }
 
+vec3 isectLinePlane(vec3 p0, vec3 p1, vec3 planePoint, vec3 planeNormal) {
+    float epsilon = 0.000001;
+    vec3 u = p1 - p0;
+    float dotProduct = dot(planeNormal, normalize(u));
+
+    if (abs(dotProduct) > epsilon) {
+        // The factor of the point between p0 -> p1 (0 - 1)
+        // if 'fac' is between (0 - 1) the point intersects with the segment.
+        // Otherwise:
+        //  < 0.0: behind p0.
+        //  > 1.0: in front of p1.
+        vec3 w = p0 - planePoint;
+        float fac = -dot(planeNormal, w) / dotProduct;
+        u *= fac;
+        return p0 + u;
+    }
+
+    // The segment is parallel to the plane.
+    return vec3(0.0); // Return a default value indicating no intersection
+}
+
+// float distanceOfLinesInPlane(vec3 linePoint1fromRay, vec3 lineDir1fromRay, vec3 linePoint2, vec3 lineDir2) {
+    
+//     return d;
+// }
+
+float distanceToLine2_hardcoded(vec3 rayPoint, vec3 rayDir, vec3 linePoint, vec3 lineDir) {
+    // 1. Get the plane that contains the line 
+    vec3 planePoint = vec3(-10.,-1,12);
+    vec3 planeNormal = vec3(0.,0.,-1.);
+    // 2. Get the intersection of the ray and the plane
+    vec3 intersectionPoint = isectLinePlane(rayPoint, rayPoint + rayDir, planePoint, planeNormal);
+
+    // first test if y = -1 and z = 12 
+    // if (intersectionPoint.y > 0.){// && intersectionPoint.z == 12.) {
+    //     return 1.;
+    // }
+    if (intersectionPoint.z == 12.) {
+        return 1.;
+    }
+    return 0.;
+}
+
+
 void main(void) {
     vec3 color = vec3(0., 0., 0.);
     if (fApplyTransform == 1.) {
@@ -161,6 +205,16 @@ void main(void) {
     // if (distance < thickness && distance > -thickness) {
     if(distance < 3.85 && distance > 3.85 - thickness) {
         color = vec3(1., 0., 0.);
+    }
+
+    if (distanceToLine2_hardcoded(V, W, lineOrigin, lineDirection) == 1.) {
+        color = vec3(1., 0., 0.);
+        gl_FragColor = vec4(sqrt(color), 1.);
+        return; 
+    } else {
+        color = vec3(0., 0., 1.);
+        gl_FragColor = vec4(sqrt(color), 1.);
+        return;
     }
 
     // vec4 rayToLineResult = rayToLine(V, W, rayDirection);
