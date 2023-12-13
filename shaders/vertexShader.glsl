@@ -1,8 +1,10 @@
 attribute vec3 aPos, aNor;
 varying vec3 vPos, vNor;
-uniform bool applyTransform; // the below matrices are only applied if this is true
+varying float fApplyTransform;
+attribute float applyTransform; // the below matrices are only applied if this is true
 uniform mat4 uMatrix, uInvMatrix;
 void main() {
+    fApplyTransform = applyTransform;
     if(true) {
         vec4 pos = uMatrix * vec4(aPos, 1.0);
         vec4 nor = vec4(aNor, 0.0) * uInvMatrix;

@@ -28,6 +28,7 @@ let start_gl = (canvas, meshData, vertexSize, vertexShader, fragmentShader) => {
     }
     vertexAttribute('aPos', 3, 0);
     vertexAttribute('aNor', 3, 3);
+    vertexAttribute('applyTransform', 1, 6);
     return gl;
 }
 

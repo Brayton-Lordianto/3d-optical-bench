@@ -16,6 +16,7 @@ uniform vec3 uCamera;
 uniform vec3 uCameraDirection;
 uniform vec3 uColor;
 varying vec3 vNor;
+varying float fApplyTransform;
 
 // Rotation matrix around the X axis.
 mat3 rotateX(float theta) {
@@ -129,10 +130,13 @@ vec3 normalizeDirection(vec3 direction) {
 }
 
 void main(void) {
-    float c = .05 + max(0., dot(normalize(vNor), vec3(.57)));
-    vec3 color = c * uColor;
-    gl_FragColor = vec4(sqrt(color), 1.);
-    return;
+    vec3 color = vec3(0., 0., 0.);
+    if (fApplyTransform == 1.) {
+        float c = .05 + max(0., dot(normalize(vNor), vec3(.57)));
+        vec3 color = c * uColor;
+        gl_FragColor = vec4(sqrt(color), 1.);
+        return;
+    }
 
     // SET BACKGROUND COLOR
 

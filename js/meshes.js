@@ -6,7 +6,7 @@ let sphere = (nu, nv) => createMesh(nu, nv, (u,v) => {
     let x = Math.cos(phi) * Math.cos(theta),
         y = Math.cos(phi) * Math.sin(theta),
         z = Math.sin(phi);
-    return [ x,y,z, x,y,z ];
+    return [ x,y,z, x,y,z, 1 ];
  });
 
 
@@ -33,4 +33,4 @@ let meshData = [
 
 // VERTEX AND FRAGMENT SHADERS
 
-let vertexSize = 6;
+let vertexSize = 7;
