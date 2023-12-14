@@ -159,19 +159,19 @@ float distanceToLine2_hardcoded(vec3 rayPoint, vec3 rayDir, vec3 linePoint, vec3
     // 1. Get the plane that contains the line 
     vec3 planePoint = vec3(-10.,-1,12);
     vec3 planeNormal = vec3(0.,0.,-1.);
+
     // 2. Get the intersection of the ray and the plane
     vec3 intersectionPoint = isectLinePlane(rayPoint, rayPoint + rayDir, planePoint, planeNormal);
 
-    // first test if y = -1 and z = 12 
-    // if (intersectionPoint.y > 0.){// && intersectionPoint.z == 12.) {
-    //     return 1.;
-    // }
+    // 3. if intersecting, get the shortest distance from (P to intesection) to Line
     if (intersectionPoint.z == 12.) {
-        return 1.;
+        vec3 lineToIntersection = intersectionPoint - linePoint;
+        // vec3 projectionVector = dot(lineToIntersection, lineDir);
     }
     return 0.;
 }
 
+// void main() {} 
 
 void main(void) {
     vec3 color = vec3(0., 0., 0.);

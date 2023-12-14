@@ -9,7 +9,8 @@ fetch('./shaders/vertexShader.glsl')
       vertexShader = shaderSource;
    });
 
-fetch('./shaders/old_fragmentShader.glsl')
+// fetch('./shaders/old_fragmentShader.glsl')
+fetch('./shaders/fragmentShader.glsl')
    .then(response => response.text())
    .then((shaderSource) => {
       fragmentShader = shaderSource;
