@@ -22,6 +22,9 @@ canvas1.onmousemove = e => {
 
 // used on wasd
 function addStep(stepVector) {
+    // NOT USING THIS FUNCTION RIGHT NOW
+    return addVectors(camera, stepVector);
+
     // stepVector is a vector of length 3, with one of the fields being `step` and the rest being 0
     let yAdjustedStepVector = multiplyMatrixVector(rotateY(cameraDirection[1]), stepVector);
     let xyAdjustedStepVector = multiplyMatrixVector(rotateX(cameraDirection[0]), yAdjustedStepVector);
@@ -37,6 +40,10 @@ document.onkeydown = e => {
     if (e.key == 's') camera = addStep([0, 0, step]);
     if (e.key == 'a') camera = addStep([-step, 0, 0]);
     if (e.key == 'd') camera = addStep([step, 0, 0]);
+    
+    // y keys 
+    if (e.key == 'q') camera = addStep([0, step, 0]);
+    if (e.key == 'e') camera = addStep([0, -step, 0]);
 }
 // on drag
 canvas1.ondragover = e => console.log("hi");

@@ -30,19 +30,19 @@ mat3 rotateY(float theta) {
 
 
 float rayCylinder(vec3 rayOrigin, vec3 rayDir) {
-    vec3 adjustedRayOrigin = rayOrigin - vec3(1.5,1.5,0.);
+    vec3 center = vec3(0.,0.,-1.);
+    float radius = 0.00001;
+    vec3 adjustedRayOrigin = rayOrigin - center;
     float a = pow(rayDir.x, 2.0) + pow(rayDir.y, 2.0);
     float b = 2.0 * (adjustedRayOrigin.x * rayDir.x + adjustedRayOrigin.y * rayDir.y);
-    float c = pow(adjustedRayOrigin.x, 2.0) + pow(adjustedRayOrigin.y, 2.0) - 1.;
+    float c = pow(adjustedRayOrigin.x, 2.0) + pow(adjustedRayOrigin.y, 2.0) - radius;
 
     float discriminant = pow(b, 2.0) - 4.0 * a * c;
+    if (discriminant < 0.0) return -1.0;
+
     float t1 = (-b - sqrt(discriminant)) / (2.0 * a);
     float t2 = (-b + sqrt(discriminant)) / (2.0 * a);
 
-    // test both z values of each t
-    if (t1 < 0.0) {
-        return -1.0;
-    }
     float z1 = adjustedRayOrigin.z + t1 * rayDir.z;
     float z2 = adjustedRayOrigin.z + t2 * rayDir.z;
     return z1; 
@@ -76,12 +76,9 @@ void main(void) {
     // ray trace to a single cylinder
     // float t = raySphere(cameraOrigin, cameraDir);
     float t = rayCylinder(cameraOrigin, cameraDir);
-    float z = rayCylinder(cameraOrigin, cameraDir);
-    if (z > 0.0 && z < 3.) {
+    if (t > 0.0 && t < 3.) {
         color = vec3(1.0, 0.0, 0.0);
-    } else if (z != -1.0) {
-        // color = vec3(0.,0.,1.);
-    }
+    } 
 
 
 
