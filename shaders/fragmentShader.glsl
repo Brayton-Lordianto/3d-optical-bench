@@ -13,6 +13,12 @@ varying float fApplyTransform;
 
 vec3 bgColor = vec3(0.23, 0.6, 0.12);
 
+// ====================================================================
+// OBJECTS
+// ====================================================================
+
+struct Sphere { vec3 center, color; float radius; };
+struct Cylinder { vec3 center, color; float radius; };
 
 // ====================================================================
 // ROTATION MATRICES
@@ -76,6 +82,14 @@ float raySphere(vec3 rayOrigin, vec3 rayDir) {
 #define HEIGHT_OF_PLANE -1. // change this to change the height of the floor plane
 
 vec4 sphereScene[100];
+vec4 box = vec4(0.,0.,-5.,0.5);
+
+float sdfBox(vec4 B, vec3 P) {
+    vec3 C = B.xyz;
+    float r = B.w;
+    vec3 d = abs(P - C) - vec3(r);
+    return length(max(d, 0.)); 
+}
 
 void initSpheres() {
     for (int i = 0; i < NSPHERES; i++) sphereScene[i] = vec4(0.,0.,0.,0.);
@@ -97,10 +111,11 @@ float sdfScene(vec3 p) {
     // the sdf to a plane is simply the height of the plane
     float heightOfPlane = HEIGHT_OF_PLANE; 
     float d = heightOfPlane < 1. ? 1000000. : heightOfPlane; 
-    for (int i = 0; i < NSPHERES; i++) {
-        if (sphereScene[i].w == 0.) break; 
-        d = min(d, sdfSphere(sphereScene[i], p));
-    }
+    // for (int i = 0; i < NSPHERES; i++) {
+    //     if (sphereScene[i].w == 0.) break; 
+    //     d = min(d, sdfSphere(sphereScene[i], p));
+    // }
+    d = min(d, sdfBox(box, p));
     return d;
 }
 
@@ -266,10 +281,10 @@ void main(void) {
 
     // ray march for spheres and render them 
     vec4 sphere = vec4(1.,0.,0.,1.);
-    // float dstToScene = rayMarch(cameraOrigin, cameraDir);
+    float dstToScene = rayMarch(cameraOrigin, cameraDir);
     // float dstToScene = testSubtractionRayMarch(cameraOrigin, cameraDir);
     // float dstToScene = testUnionRayMarch(cameraOrigin, cameraDir, 0.2);
-    float dstToScene = testIntersectionRayMarch(cameraOrigin, cameraDir);
+    // float dstToScene = testIntersectionRayMarch(cameraOrigin, cameraDir);
     if (dstToScene < MAX_DIST) {
         vec3 intersectionPoint = cameraOrigin + cameraDir * dstToScene;
         color = getColor(intersectionPoint);
