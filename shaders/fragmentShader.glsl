@@ -122,6 +122,10 @@ float sdfSphere(Sphere S, vec3 P) {
     return sdfSphere(vec4(S.center, S.radius), P);
 }
 
+float getHeightOfPlane() {
+    return HEIGHT_OF_PLANE < 1. ? 1000000. : HEIGHT_OF_PLANE;
+}
+
 // get shortest SDF from a point to any sphere
 float sdfScene(vec3 p) {
     // the sdf to a plane is simply the height of the plane
@@ -159,7 +163,7 @@ float rayMarch(vec3 rayOrigin, vec3 rayDir) {
         if (accDstToScene > MAX_DIST || currDstToScene < MIN_DIST) break; 
     }
     return accDstToScene;
-}
+} 
 
 // ====================================================================
 // BOOLEAN OPERATIONS ON RAY MARCHING
@@ -167,10 +171,9 @@ float rayMarch(vec3 rayOrigin, vec3 rayDir) {
 
 // get SDF with the intent of choosing an SDF to a subtraction of two spheres 
 float sdfSubtraction(vec3 p) {
-    float heightOfPlane = HEIGHT_OF_PLANE;
-    float d = heightOfPlane < 1. ? 1000000. : heightOfPlane;
-    d = min(d, sdfSphere(sphereScene[0], p));
-    d = max(d, -sdfSphere(sphereScene[1], p));
+    float heightOfPlane = getHeightOfPlane();
+    float d = max(-sdfSphere(sphereScene[0], p), sdfSphere(sphereScene[1], p));
+    d = min(d, heightOfPlane);
     return d;
 }
 
@@ -238,22 +241,24 @@ struct RayMarchHit { float distance; vec3 colorOfObject; };
 
 RayMarchHit sdfConcaveTest(vec3 p) {
     // make 2 spheres and a box
-    Sphere sphere1 = Sphere(vec3(-1.,0.,-5.), vec3(1.,0.,0.), 0.5);
-    Sphere sphere2 = Sphere(vec3(0.35,0.,-5.), vec3(0.,0.,1.), 0.35);
-    Box box = Box(vec3(0.,0.,-5.), vec3(1.,1.,1.), 1.);
+    float sphereX = 0.75;
+    Sphere sphere1 = Sphere(vec3(-sphereX,0.,-1.), vec3(1.,0.,0.), 0.75);
+    Sphere sphere2 = Sphere(vec3(sphereX,0.,-1.), vec3(0.,0.,1.), 0.75);
+    Box box = Box(vec3(0.,0.,-1.), vec3(1.,1.,1.), .25);
 
-    float heightOfPlane = HEIGHT_OF_PLANE < 1. ? 1000000. : HEIGHT_OF_PLANE;
-    // float d = max(sdfBox(box, p), -sdfSphere(sphere1, p));
+    float heightOfPlane = getHeightOfPlane();
+    float d = max(sdfBox(box, p), -sdfSphere(sphere1, p));
+    d = max(d, -sdfSphere(sphere2, p));
     // float d = max(-sdfBox(box, p), sdfSphere(sphere1, p));
-    float d; 
+    // float d; 
     float d1 = sdfBox(box, p);
     float d2 = sdfSphere(sphere1, p);
     float d3 = sdfSphere(sphere2, p);
-    d = min(min(d1, d2), d3);
+    // d = min(min(d1, d2), d3);
     if (d == d1) return RayMarchHit(d, box.color);
     if (d == d2) return RayMarchHit(d, sphere1.color);
-    if (d == d3) return RayMarchHit(d, sphere2.color);
-    return RayMarchHit(d, vec3(1.,0.,0.));
+    // if (d == d3) return RayMarchHit(d, sphere2.color);
+    return RayMarchHit(d, sphere1.color);
     // return min(d, heightOfPlane);
 
 }
