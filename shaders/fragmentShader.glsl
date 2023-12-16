@@ -68,6 +68,7 @@ float raySphere(vec3 rayOrigin, vec3 rayDir) {
 // ====================================================================
 // RAY MARCHING
 // ====================================================================
+
 #define MAX_STEPS 100
 #define MAX_DIST 100.
 #define MIN_DIST 0.01
@@ -103,16 +104,6 @@ float sdfScene(vec3 p) {
     return d;
 }
 
-// get SDF with the intent of choosing an SDF to a subtraction of two spheres 
-float sdfSubtraction(vec3 p) {
-    float heightOfPlane = HEIGHT_OF_PLANE;
-    float d = heightOfPlane < 1. ? 1000000. : heightOfPlane;
-    d = min(d, sdfSphere(sphereScene[0], p));
-    d = max(d, -sdfSphere(sphereScene[1], p));
-    return d;
-}
-
-
 // this calculates the normal of the point for lighting purposes. It does so by calculating little gradients
 vec3 calculateNormal(in vec3 p) {
     const vec3 small_step = vec3(0.001, 0.0, 0.0);
@@ -139,6 +130,19 @@ float rayMarch(vec3 rayOrigin, vec3 rayDir) {
     return accDstToScene;
 }
 
+// ====================================================================
+// BOOLEAN OPERATIONS ON RAY MARCHING
+// ====================================================================
+
+// get SDF with the intent of choosing an SDF to a subtraction of two spheres 
+float sdfSubtraction(vec3 p) {
+    float heightOfPlane = HEIGHT_OF_PLANE;
+    float d = heightOfPlane < 1. ? 1000000. : heightOfPlane;
+    d = min(d, sdfSphere(sphereScene[0], p));
+    d = max(d, -sdfSphere(sphereScene[1], p));
+    return d;
+}
+
 float testSubtractionRayMarch(vec3 rayOrigin, vec3 rayDir) {
     float accDstToScene = 0.; 
     for (int i = 0; i<MAX_STEPS; i++) {
@@ -149,6 +153,59 @@ float testSubtractionRayMarch(vec3 rayOrigin, vec3 rayDir) {
     }
     return accDstToScene;
 }
+
+// get SDF with the intent of choosing an SDF to a union of two spheres
+float smoothmin(float distanceToA, float distanceToB, float smoothness) {
+    float h = clamp(0.5 + 0.5 * (distanceToB - distanceToA) / smoothness, 0.0, 1.0);
+    return mix(distanceToB, distanceToA, h) - smoothness * h * (1.0 - h);
+}
+
+float sdfUnion(vec3 p, float smoothness) {
+    float heightOfPlane = HEIGHT_OF_PLANE;
+    float d = heightOfPlane < 1. ? 1000000. : heightOfPlane;
+    d = smoothmin(d, sdfSphere(sphereScene[0], p), smoothness);
+    d = smoothmin(d, sdfSphere(sphereScene[1], p), smoothness);
+    return d;
+}
+
+float testUnionRayMarch(vec3 rayOrigin, vec3 rayDir, float smoothness) {
+    float accDstToScene = 0.; 
+    for (int i = 0; i<MAX_STEPS; i++) {
+        vec3 pointOnSphereCast = rayOrigin + rayDir * accDstToScene;
+        float currDstToScene = sdfUnion(pointOnSphereCast, smoothness);
+        accDstToScene += currDstToScene;
+        if (accDstToScene > MAX_DIST || currDstToScene < MIN_DIST) break; 
+    }
+    return accDstToScene;
+}
+
+// get SDF with the intent of choosing an SDF to an intersection of two spheres
+float smoothmax(float distanceToA, float distanceToB, float smoothness) {
+    float h = clamp(0.5 + 0.5 * (distanceToB - distanceToA) / smoothness, 0.0, 1.0);
+    return mix(distanceToA, distanceToB, h) + smoothness * h * (1.0 - h);
+}
+
+float sdfIntersection(vec3 p) {
+    float heightOfPlane = HEIGHT_OF_PLANE < 1. ? 1000000. : HEIGHT_OF_PLANE;
+    float d = smoothmax(sdfSphere(sphereScene[0], p), sdfSphere(sphereScene[1], p), 0.05);
+    d = min(d, heightOfPlane);
+    return d;
+}
+
+float testIntersectionRayMarch(vec3 rayOrigin, vec3 rayDir) {
+    float accDstToScene = 0.; 
+    for (int i = 0; i<MAX_STEPS; i++) {
+        vec3 pointOnSphereCast = rayOrigin + rayDir * accDstToScene;
+        float currDstToScene = sdfIntersection(pointOnSphereCast);
+        accDstToScene += currDstToScene;
+        if (accDstToScene > MAX_DIST || currDstToScene < MIN_DIST) break; 
+    }
+    return accDstToScene;
+}
+
+// ====================================================================
+// LIGHTING ON RAY MARCHING
+// ====================================================================
 
 // getting shadows with ray marching. It is as simple as ray marching from the intersection point, and checking if that sdf is less than the distance to the light
 bool isShadowed(vec3 intersectedPoint, vec3 lightPos) {
@@ -173,13 +230,18 @@ float getLight(vec3 point, vec3 lightPos, vec3 lightColor) {
 }
 
 vec3 getColor(vec3 point) {
-    vec3 lightPos = vec3(-5.,0.,-5.); // vec3(0., 1., 0.);
+    vec3 lightPos = vec3(0.,6.,-5.); // vec3(0., 1., 0.);
     vec3 lightColor = vec3(1., 1., 1.);
     float diffuse = getLight(point, lightPos, lightColor);
     vec3 diffuseComponent = vec3(diffuse); 
     if (isShadowed(point, lightPos)) diffuseComponent = applyShadow(diffuseComponent);
-    return diffuseComponent;
+    vec3 ambientComponent = vec3(.5);
+    return diffuseComponent + ambientComponent;
 }
+
+// ====================================================================
+// MAIN
+// ====================================================================
 
 void initialize(inout vec3 color, inout vec3 cameraOrigin, inout vec3 cameraDir) {
     color = vec3(0.0, 0.0, 0.0);
@@ -205,7 +267,9 @@ void main(void) {
     // ray march for spheres and render them 
     vec4 sphere = vec4(1.,0.,0.,1.);
     // float dstToScene = rayMarch(cameraOrigin, cameraDir);
-    float dstToScene = testSubtractionRayMarch(cameraOrigin, cameraDir);
+    // float dstToScene = testSubtractionRayMarch(cameraOrigin, cameraDir);
+    // float dstToScene = testUnionRayMarch(cameraOrigin, cameraDir, 0.2);
+    float dstToScene = testIntersectionRayMarch(cameraOrigin, cameraDir);
     if (dstToScene < MAX_DIST) {
         vec3 intersectionPoint = cameraOrigin + cameraDir * dstToScene;
         color = getColor(intersectionPoint);
