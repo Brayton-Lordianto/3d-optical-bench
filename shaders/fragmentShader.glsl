@@ -72,15 +72,16 @@ float raySphere(vec3 rayOrigin, vec3 rayDir) {
 #define MAX_DIST 100.
 #define MIN_DIST 0.01
 #define SURF_DIST 0.05
+#define HEIGHT_OF_PLANE -1. // change this to change the height of the floor plane
 
 vec4 sphereScene[100];
 
 void initSpheres() {
     for (int i = 0; i < NSPHERES; i++) sphereScene[i] = vec4(0.,0.,0.,0.);
 
-    float r = 0.001; // = 1.0;
-    sphereScene[0] = vec4(0.5,0.,1.,r);
-    sphereScene[1] = vec4(-0.5,0.,1.,r);
+    float r = 1.; // = 0.001; // = 1.0;
+    sphereScene[0] = vec4(0.5,0.,-5.,r);
+    sphereScene[1] = vec4(-0.5,0.,-5.,r);
 }
 
 // the distance function for a sphere
@@ -93,7 +94,7 @@ float sdfSphere(vec4 S, vec3 P) {
 // get shortest SDF from a point to any sphere
 float sdfScene(vec3 p) {
     // the sdf to a plane is simply the height of the plane
-    float heightOfPlane = -1.; 
+    float heightOfPlane = HEIGHT_OF_PLANE; 
     float d = heightOfPlane < 1. ? 1000000. : heightOfPlane; 
     for (int i = 0; i < NSPHERES; i++) {
         if (sphereScene[i].w == 0.) break; 
@@ -101,6 +102,16 @@ float sdfScene(vec3 p) {
     }
     return d;
 }
+
+// get SDF with the intent of choosing an SDF to a subtraction of two spheres 
+float sdfSubtraction(vec3 p) {
+    float heightOfPlane = HEIGHT_OF_PLANE;
+    float d = heightOfPlane < 1. ? 1000000. : heightOfPlane;
+    d = min(d, sdfSphere(sphereScene[0], p));
+    d = max(d, -sdfSphere(sphereScene[1], p));
+    return d;
+}
+
 
 // this calculates the normal of the point for lighting purposes. It does so by calculating little gradients
 vec3 calculateNormal(in vec3 p) {
@@ -122,6 +133,17 @@ float rayMarch(vec3 rayOrigin, vec3 rayDir) {
     for (int i = 0; i<MAX_STEPS; i++) {
         vec3 pointOnSphereCast = rayOrigin + rayDir * accDstToScene;
         float currDstToScene = sdfScene(pointOnSphereCast);
+        accDstToScene += currDstToScene;
+        if (accDstToScene > MAX_DIST || currDstToScene < MIN_DIST) break; 
+    }
+    return accDstToScene;
+}
+
+float testSubtractionRayMarch(vec3 rayOrigin, vec3 rayDir) {
+    float accDstToScene = 0.; 
+    for (int i = 0; i<MAX_STEPS; i++) {
+        vec3 pointOnSphereCast = rayOrigin + rayDir * accDstToScene;
+        float currDstToScene = sdfSubtraction(pointOnSphereCast);
         accDstToScene += currDstToScene;
         if (accDstToScene > MAX_DIST || currDstToScene < MIN_DIST) break; 
     }
@@ -151,7 +173,7 @@ float getLight(vec3 point, vec3 lightPos, vec3 lightColor) {
 }
 
 vec3 getColor(vec3 point) {
-    vec3 lightPos = vec3(0., 1., 0.);
+    vec3 lightPos = vec3(-5.,0.,-5.); // vec3(0., 1., 0.);
     vec3 lightColor = vec3(1., 1., 1.);
     float diffuse = getLight(point, lightPos, lightColor);
     vec3 diffuseComponent = vec3(diffuse); 
@@ -182,7 +204,8 @@ void main(void) {
 
     // ray march for spheres and render them 
     vec4 sphere = vec4(1.,0.,0.,1.);
-    float dstToScene = rayMarch(cameraOrigin, cameraDir);
+    // float dstToScene = rayMarch(cameraOrigin, cameraDir);
+    float dstToScene = testSubtractionRayMarch(cameraOrigin, cameraDir);
     if (dstToScene < MAX_DIST) {
         vec3 intersectionPoint = cameraOrigin + cameraDir * dstToScene;
         color = getColor(intersectionPoint);
