@@ -17,8 +17,16 @@ vec3 bgColor = vec3(0.23, 0.6, 0.12);
 // OBJECTS
 // ====================================================================
 
-struct Sphere { vec3 center, color; float radius; };
+struct Sphere { vec3 center, color; float radius;  };
 struct Cylinder { vec3 center, color; float radius; };
+struct Box { vec3 center, color; float radius; };
+
+// a convex lens is twos spheres intersecting 
+struct ConvexLens { Sphere sphere1, sphere2; }; 
+// a concave lens is a box subtracted from two spheres
+struct ConcaveLens { Sphere sphere1, sphere2; Box box; };
+
+
 
 // ====================================================================
 // ROTATION MATRICES
@@ -91,6 +99,10 @@ float sdfBox(vec4 B, vec3 P) {
     return length(max(d, 0.)); 
 }
 
+float sdfBox(Box B, vec3 P) {
+    return sdfBox(vec4(B.center, B.radius), P);
+}
+
 void initSpheres() {
     for (int i = 0; i < NSPHERES; i++) sphereScene[i] = vec4(0.,0.,0.,0.);
 
@@ -104,6 +116,10 @@ float sdfSphere(vec4 S, vec3 P) {
     vec3 C = S.xyz;
     float r = S.w;
     return length(P - C) - r;
+}
+
+float sdfSphere(Sphere S, vec3 P) {
+    return sdfSphere(vec4(S.center, S.radius), P);
 }
 
 // get shortest SDF from a point to any sphere
@@ -218,6 +234,44 @@ float testIntersectionRayMarch(vec3 rayOrigin, vec3 rayDir) {
     return accDstToScene;
 }
 
+struct RayMarchHit { float distance; vec3 colorOfObject; };
+
+RayMarchHit sdfConcaveTest(vec3 p) {
+    // make 2 spheres and a box
+    Sphere sphere1 = Sphere(vec3(-1.,0.,-5.), vec3(1.,0.,0.), 0.5);
+    Sphere sphere2 = Sphere(vec3(0.35,0.,-5.), vec3(0.,0.,1.), 0.35);
+    Box box = Box(vec3(0.,0.,-5.), vec3(1.,1.,1.), 1.);
+
+    float heightOfPlane = HEIGHT_OF_PLANE < 1. ? 1000000. : HEIGHT_OF_PLANE;
+    // float d = max(sdfBox(box, p), -sdfSphere(sphere1, p));
+    // float d = max(-sdfBox(box, p), sdfSphere(sphere1, p));
+    float d; 
+    float d1 = sdfBox(box, p);
+    float d2 = sdfSphere(sphere1, p);
+    float d3 = sdfSphere(sphere2, p);
+    d = min(min(d1, d2), d3);
+    if (d == d1) return RayMarchHit(d, box.color);
+    if (d == d2) return RayMarchHit(d, sphere1.color);
+    if (d == d3) return RayMarchHit(d, sphere2.color);
+    return RayMarchHit(d, vec3(1.,0.,0.));
+    // return min(d, heightOfPlane);
+
+}
+
+RayMarchHit testMakeConcaveRayMarch(vec3 rayOrigin, vec3 rayDir) {
+    // march to subtraction of box with sphere 
+    float accDstToScene = 0.;
+    vec3 colorOfObject = vec3(1.,0.,0.);
+    for (int i = 0; i<MAX_STEPS; i++) {
+        vec3 pointOnSphereCast = rayOrigin + rayDir * accDstToScene;
+        RayMarchHit rayMarchHit = sdfConcaveTest(pointOnSphereCast);
+        float currDstToScene = rayMarchHit.distance;
+        accDstToScene += currDstToScene;
+        colorOfObject = rayMarchHit.colorOfObject;
+        if (accDstToScene > MAX_DIST || currDstToScene < MIN_DIST) break; 
+    }
+    return RayMarchHit(accDstToScene, colorOfObject);
+}
 // ====================================================================
 // LIGHTING ON RAY MARCHING
 // ====================================================================
@@ -281,13 +335,17 @@ void main(void) {
 
     // ray march for spheres and render them 
     vec4 sphere = vec4(1.,0.,0.,1.);
-    float dstToScene = rayMarch(cameraOrigin, cameraDir);
+    // float dstToScene = rayMarch(cameraOrigin, cameraDir);
     // float dstToScene = testSubtractionRayMarch(cameraOrigin, cameraDir);
     // float dstToScene = testUnionRayMarch(cameraOrigin, cameraDir, 0.2);
     // float dstToScene = testIntersectionRayMarch(cameraOrigin, cameraDir);
+    // float dstToScene = testMakeConcaveRayMarch(cameraOrigin, cameraDir);
+    RayMarchHit rayMarchHit = testMakeConcaveRayMarch(cameraOrigin, cameraDir);
+    float dstToScene = rayMarchHit.distance;
     if (dstToScene < MAX_DIST) {
         vec3 intersectionPoint = cameraOrigin + cameraDir * dstToScene;
-        color = getColor(intersectionPoint);
+        // color = getColor(intersectionPoint);
+        color = getColor(intersectionPoint) * rayMarchHit.colorOfObject;
     }
 
 
