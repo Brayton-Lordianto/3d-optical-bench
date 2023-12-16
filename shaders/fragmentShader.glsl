@@ -18,15 +18,16 @@ vec3 bgColor = vec3(0.23, 0.6, 0.12);
 // ====================================================================
 
 struct Sphere { vec3 center, color; float radius;  };
-struct Cylinder { vec3 center, color; float radius; };
 struct Box { vec3 center, color; float radius; };
+struct Line { vec3 centerOfSphere1, centerOfSphere2, color; float radius; }; // a capsule is a line with two spheres on the end
 
 // a convex lens is twos spheres intersecting 
-struct ConvexLens { Sphere sphere1, sphere2; }; 
 // a concave lens is a box subtracted from two spheres
-struct ConcaveLens { Sphere sphere1, sphere2; Box box; };
-
-
+struct LensProperties { float focalLength, thickness, angle; vec3 coordinate; };
+struct ConvexLens { Sphere sphere1, sphere2; LensProperties properties; }; 
+struct ConcaveLens { Sphere sphere1, sphere2; Box box; LensProperties properties; };
+struct OpticalComponent { ConvexLens convexLens; ConcaveLens concaveLens; bool isConvex; };
+struct OpticalComponents { OpticalComponent components[100]; int size; };
 
 // ====================================================================
 // ROTATION MATRICES
@@ -44,42 +45,7 @@ mat3 rotateY(float theta) {
     float s = sin(theta);
     return mat3(vec3(c, 0, s), vec3(0, 1, 0), vec3(-s, 0, c));
 }
-
-// ====================================================================
-// RAY TRACING
-// ====================================================================
-float rayCylinder(vec3 rayOrigin, vec3 rayDir) {
-    vec3 center = vec3(0.,0.,-1.);
-    float radius = 0.00001;
-    vec3 adjustedRayOrigin = rayOrigin - center;
-    float a = pow(rayDir.x, 2.0) + pow(rayDir.y, 2.0);
-    float b = 2.0 * (adjustedRayOrigin.x * rayDir.x + adjustedRayOrigin.y * rayDir.y);
-    float c = pow(adjustedRayOrigin.x, 2.0) + pow(adjustedRayOrigin.y, 2.0) - radius;
-
-    float discriminant = pow(b, 2.0) - 4.0 * a * c;
-    if (discriminant < 0.0) return -1.0;
-
-    float t1 = (-b - sqrt(discriminant)) / (2.0 * a);
-    float t2 = (-b + sqrt(discriminant)) / (2.0 * a);
-
-    float z1 = adjustedRayOrigin.z + t1 * rayDir.z;
-    float z2 = adjustedRayOrigin.z + t2 * rayDir.z;
-    return z2; 
-
-}
-
-float raySphere(vec3 rayOrigin, vec3 rayDir) {
-    vec3 center = vec3(0.,0.,-1.);
-    float a = dot(rayDir, rayDir);
-    float b = 2.0 * dot(rayOrigin - center, rayDir);
-    float c = dot(rayOrigin - center, rayOrigin - center) - 1.0;
-
-    float discriminant = pow(b, 2.0) - 4.0 * a * c;
-    float t = (-b - sqrt(discriminant)) / (2.0 * a);
-    return t;
-}
-
-// ====================================================================
+// ==========================================================
 // RAY MARCHING
 // ====================================================================
 
@@ -277,6 +243,41 @@ RayMarchHit testMakeConcaveRayMarch(vec3 rayOrigin, vec3 rayDir) {
     }
     return RayMarchHit(accDstToScene, colorOfObject);
 }
+
+Line exampleLine = Line(vec3(-1.,0.,-5.), vec3(1.,2.,-3.), vec3(1.,1.,1.), 0.0001);
+Line exampleLine2 = Line(vec3(1.,2.,-3.), vec3(1.,-2.,-3.), vec3(1.,1.,1.), 0.0001);
+
+RayMarchHit sdfLine(vec3 p, Line line) {
+    vec3 sphere1toSphere2 = line.centerOfSphere2 - line.centerOfSphere1;
+    vec3 sphere1toP = p - line.centerOfSphere1;
+    float stepsInDirectionOfMidLine = dot(sphere1toP, sphere1toSphere2) / dot(sphere1toSphere2, sphere1toSphere2);
+    float clampedStepsInDirectionOfMidLine = clamp(stepsInDirectionOfMidLine, 0., 1.);
+    vec3 closestPointOnLine = line.centerOfSphere1 + clampedStepsInDirectionOfMidLine * sphere1toSphere2;
+    float distanceToCapsuleSurface = length(p - closestPointOnLine) - line.radius;
+    return RayMarchHit(distanceToCapsuleSurface, line.color);
+}
+
+RayMarchHit sdfTwoLines(vec3 p) {
+    RayMarchHit rayMarchHit1 = sdfLine(p, exampleLine);
+    RayMarchHit rayMarchHit2 = sdfLine(p, exampleLine2);
+    return RayMarchHit(min(rayMarchHit1.distance, rayMarchHit2.distance), rayMarchHit1.colorOfObject);
+}
+
+RayMarchHit testMakeCapsuleRayMarch(vec3 rayOrigin, vec3 rayDir) {
+    // march to subtraction of box with sphere 
+    float accDstToScene = 0.;
+    vec3 colorOfObject = vec3(1.,0.,0.);
+    for (int i = 0; i<MAX_STEPS; i++) {
+        vec3 pointOnSphereCast = rayOrigin + rayDir * accDstToScene;
+        RayMarchHit rayMarchHit = sdfTwoLines(pointOnSphereCast);
+        float currDstToScene = rayMarchHit.distance;
+        accDstToScene += currDstToScene;
+        colorOfObject = rayMarchHit.colorOfObject;
+        if (accDstToScene > MAX_DIST || currDstToScene < MIN_DIST) break; 
+    }
+    return RayMarchHit(accDstToScene, colorOfObject);
+}
+
 // ====================================================================
 // LIGHTING ON RAY MARCHING
 // ====================================================================
@@ -331,13 +332,6 @@ void main(void) {
     // initialize camera ray and color 
     vec3 color, cameraOrigin, cameraDir; initialize(color, cameraOrigin, cameraDir);
 
-    // ray trace to a single cylinder
-    // float t = raySphere(cameraOrigin, cameraDir);
-    float t = rayCylinder(cameraOrigin, cameraDir);
-    if (t > 1.0 && t < 3.) {
-        color = vec3(1.0, 0.0, 0.0);
-    } 
-
     // ray march for spheres and render them 
     vec4 sphere = vec4(1.,0.,0.,1.);
     // float dstToScene = rayMarch(cameraOrigin, cameraDir);
@@ -345,11 +339,12 @@ void main(void) {
     // float dstToScene = testUnionRayMarch(cameraOrigin, cameraDir, 0.2);
     // float dstToScene = testIntersectionRayMarch(cameraOrigin, cameraDir);
     // float dstToScene = testMakeConcaveRayMarch(cameraOrigin, cameraDir);
-    RayMarchHit rayMarchHit = testMakeConcaveRayMarch(cameraOrigin, cameraDir);
+    // RayMarchHit rayMarchHit = testMakeConcaveRayMarch(cameraOrigin, cameraDir);
+    RayMarchHit rayMarchHit = testMakeCapsuleRayMarch(cameraOrigin, cameraDir);
     float dstToScene = rayMarchHit.distance;
     if (dstToScene < MAX_DIST) {
         vec3 intersectionPoint = cameraOrigin + cameraDir * dstToScene;
-        // color = getColor(intersectionPoint);
+        color = getColor(intersectionPoint);
         color = getColor(intersectionPoint) * rayMarchHit.colorOfObject;
     }
 
