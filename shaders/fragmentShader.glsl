@@ -27,7 +27,7 @@ struct Lines { Line at[LINES_SIZE]; int size; };
 struct Sphere { vec3 center, color; float radius;  };
 struct Box { vec3 center, color; float radius; };
 Line exampleLine = Line(vec3(-1.,0.,-5.), vec3(1.,2.,-3.), vec3(1.,1.,1.)); Line exampleLine2 = Line(vec3(1.,2.,-3.), vec3(1.,-2.,-3.), vec3(1.,1.,1.));
-Sphere exampleSphere = Sphere(vec3(0.5,0.,-5.), vec3(1.,0.,0.), 1.); Sphere exampleSphere2 = Sphere(vec3(-0.5,0.,-5.), vec3(1.,0.,0.), 01.);
+Sphere exampleSphere = Sphere(vec3(0.6,0.,-5.), vec3(1.,0.,0.), 1.); Sphere exampleSphere2 = Sphere(vec3(-0.6,0.,-5.), vec3(1.,0.,0.), 01.);
 
 
 // a convex lens is twos spheres intersecting 
@@ -70,6 +70,8 @@ float smoothmax(float distanceToA, float distanceToB, float smoothness) {
 // OTHER UTILITIES
 // ====================================================================
 
+vec3 O = vec3(0.,0.,0.);
+
 // returns the second if x < y
 // otherwise return the default value
 float ReturnSecondIfXltY(float x, float y, float second, float defaultVal) {
@@ -83,6 +85,10 @@ vec3 ReturnSecondIfXltY(float x, float y, vec3 second, vec3 defaultVal) {
 #define HEIGHT_OF_PLANE -1. // change this to change the height of the floor plane
 float getHeightOfPlane() {
     return HEIGHT_OF_PLANE < 1. ? 1000000. : HEIGHT_OF_PLANE;
+}
+
+Sphere SphereWithRadius(float radius) {
+    return Sphere(vec3(0.,0.,0.), vec3(1.,1.,1.), radius);
 }
 
 // ==========================================================
@@ -247,6 +253,24 @@ void initializeLines() {
     lines.size = 3;
 }
 
+OpticalComponent createConcaveLens(vec3 coordinate, float thickness) {
+    float rbox = thickness; 
+    float a = (sqrt(3.) / 4.) * rbox;
+    float xOffset = rbox + a; 
+    float rsphere = sqrt(pow(rbox, 2.) + pow(a, 2.));
+    float diff = rbox / 0.1 * 0.03; // from experimentation
+    float constant = 0.6; // from experimentation
+    xOffset += constant;
+    rsphere += constant + diff;
+
+    Sphere sphere3 = SphereWithRadius(rsphere); Sphere sphere4 = SphereWithRadius(rsphere);
+    Box box = Box(coordinate, vec3(1.,0.,0.), rbox);
+    sphere3.center += coordinate; sphere4.center += coordinate;
+    sphere3.center.x += xOffset; sphere4.center.x -= xOffset;
+    LensProperties properties2 = LensProperties(1., thickness, 0.5, vec3(0.,0.,-5.5));
+    ConcaveLens concaveLens = ConcaveLens(sphere3, sphere4, box, properties2);
+    return OpticalComponent(nullConvexLens, concaveLens, false);
+}
 
 void initializeOpticalComponents() {
     // convex lens
@@ -258,13 +282,7 @@ void initializeOpticalComponents() {
     opticalComponents.at[0] = convexLensComponent;
 
     // concave lens
-    Sphere sphere3 = sphere1;
-    Sphere sphere4 = sphere2;
-    sphere3.center.x -= 2.; sphere4.center.x -= 2.;
-    Box box = Box(vec3(-2.,0.,-5.5), vec3(1.,0.,0.), 0.5);
-    LensProperties properties2 = LensProperties(1., 0.5, 0.5, vec3(0.,0.,-5.5));
-    ConcaveLens concaveLens = ConcaveLens(sphere3, sphere4, box, properties2);
-    OpticalComponent concaveLensComponent = OpticalComponent(nullConvexLens, concaveLens, false);
+    OpticalComponent concaveLensComponent = createConcaveLens(vec3(-2.,0.,-5.), 0.2);
     opticalComponents.at[1] = concaveLensComponent;
 
     opticalComponents.size = 2;
