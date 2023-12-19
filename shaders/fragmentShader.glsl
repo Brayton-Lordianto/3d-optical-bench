@@ -17,18 +17,18 @@ vec3 bgColor = vec3(0.23, 0.6, 0.12);
 // OBJECTS
 // ====================================================================
 
+vec3 red = vec3(1.,0.,0.), green = vec3(0.,1.,0.), blue = vec3(0.,0.,1.), white = vec3(1.,1.,1.), black = vec3(0.,0.,0.), yellow = vec3(1.,1.,0.), purple = vec3(1.,0.,1.), cyan = vec3(0.,1.,1.), orange = vec3(1.,0.5,0.), pink = vec3(1.,0.5,0.5), brown = vec3(0.5,0.25,0.);
 # define OBJECTS_SIZE 10
-# define LINES_SIZE OBJECTS_SIZE
+# define LINES_SIZE OBJECTS_SIZE * 2
 # define OPTICAL_COMPONENTS_SIZE OBJECTS_SIZE
 
 # define LINE_RADIUS 0.0001; 
-struct Line { vec3 centerOfSphere1, centerOfSphere2, color; }; // a capsule is a line with two spheres on the end
+struct Line { vec3 point1, point2, color; }; // a capsule is a line with two spheres on the end
 struct Lines { Line at[LINES_SIZE]; int size; };
 struct Sphere { vec3 center, color; float radius;  };
 struct Box { vec3 center, color; float radius; };
 Line exampleLine = Line(vec3(-1.,0.,-5.), vec3(1.,2.,-3.), vec3(1.,1.,1.)); Line exampleLine2 = Line(vec3(1.,2.,-3.), vec3(1.,-2.,-3.), vec3(1.,1.,1.));
 Sphere exampleSphere = Sphere(vec3(0.6,0.,-5.), vec3(1.,0.,0.), 1.); Sphere exampleSphere2 = Sphere(vec3(-0.6,0.,-5.), vec3(1.,0.,0.), 01.);
-
 
 // a convex lens is twos spheres intersecting 
 // a concave lens is a box subtracted from two spheres
@@ -41,7 +41,7 @@ ConvexLens nullConvexLens = ConvexLens(Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.
 ConcaveLens nullConcaveLens = ConcaveLens(Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), Box(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), LensProperties(0., 0., 0., vec3(0.,0.,0.)));
 
 OpticalComponents opticalComponents;
-Lines lines;
+uniform Lines lines;
 
 // ====================================================================
 // MATHEMATICAL UTILITIES
@@ -89,11 +89,15 @@ float getHeightOfPlane() {
     return HEIGHT_OF_PLANE < 1. ? 1000000. : HEIGHT_OF_PLANE;
 }
 
+Line line(vec3 from, vec3 to) {
+    return Line(from, to, vec3(1.,1.,1.));
+}
+
 Sphere SphereWithRadius(float radius) {
     return Sphere(vec3(0.,0.,0.), vec3(1.,1.,1.), radius);
 }
 
-
+// TODO: calculations
 OpticalComponent createConcaveLens(vec3 coordinate, float unadjustedThickness) {
     float thickness = unadjustedThickness - 0.15; // now thickness from convex and concave lens are the same by scale
     float rbox = thickness; 
@@ -109,7 +113,7 @@ OpticalComponent createConcaveLens(vec3 coordinate, float unadjustedThickness) {
     Box box = Box(coordinate, vec3(1.,0.,0.), rbox);
     sphere3.center += coordinate; sphere4.center += coordinate;
     sphere3.center.x += xOffset; sphere4.center.x -= xOffset;
-    LensProperties properties2 = LensProperties(1., thickness, 0.5, vec3(0.,0.,-5.5));
+    LensProperties properties2 = LensProperties(1., rbox, 0.5, coordinate);
     ConcaveLens concaveLens = ConcaveLens(sphere3, sphere4, box, properties2);
     return OpticalComponent(nullConvexLens, concaveLens, false);
 }
@@ -158,11 +162,11 @@ RayMarchHit sdfSphere(vec3 p, Sphere sphere) {
 }
 
 RayMarchHit sdfLine(vec3 p, Line line) {
-    vec3 sphere1toSphere2 = line.centerOfSphere2 - line.centerOfSphere1;
-    vec3 sphere1toP = p - line.centerOfSphere1;
+    vec3 sphere1toSphere2 = line.point2 - line.point1;
+    vec3 sphere1toP = p - line.point1;
     float stepsInDirectionOfMidLine = dot(sphere1toP, sphere1toSphere2) / dot(sphere1toSphere2, sphere1toSphere2);
     float clampedStepsInDirectionOfMidLine = clamp(stepsInDirectionOfMidLine, 0., 1.);
-    vec3 closestPointOnLine = line.centerOfSphere1 + clampedStepsInDirectionOfMidLine * sphere1toSphere2;
+    vec3 closestPointOnLine = line.point1 + clampedStepsInDirectionOfMidLine * sphere1toSphere2;
     float distanceToCapsuleSurface = length(p - closestPointOnLine) - LINE_RADIUS;
     return RayMarchHit(distanceToCapsuleSurface, line.color);
 }
@@ -286,21 +290,24 @@ vec3 getColor(vec3 point) {
 // ====================================================================
 
 void initializeLines() {
-    lines.at[0] = exampleLine;
-    lines.at[1] = exampleLine2;
-    lines.at[2] = Line(vec3(1.,-2.,-3.), vec3(-1.,0.,-5.), vec3(1.,1.,1.));
-    lines.size = 3;
+    // lines.at[0] = line(vec3(-3.,0.,-5.),  opticalComponents.at[0].concaveLens.box.center + opticalComponents.at[0].concaveLens.properties.thickness * vec3(1.,1.,1.));
+    // lines.at[1] = line(opticalComponents.at[0].concaveLens.box.center + opticalComponents.at[0].concaveLens.properties.thickness * vec3(1.,1.,1.), opticalComponents.at[1].convexLens.properties.coordinate + opticalComponents.at[1].convexLens.properties.thickness * vec3(0.,1.,1.));
+    // lines.at[2] = line(opticalComponents.at[1].convexLens.properties.coordinate + opticalComponents.at[1].convexLens.properties.thickness * vec3(0.,1.,1.), vec3(1.,0.,-5.));
+    // lines.at[2] = Line(vec3(1.,-2.,-3.), vec3(-1.,0.,-5.), vec3(1.,1.,1.));
+    // lines.size = 3;
 }
 
 void initializeOpticalComponents() {
-    // convex lens
     float radius = .6;
-    OpticalComponent convexLensComponent = createConvexLens(vec3(0.,0.,-5.), radius);
-    opticalComponents.at[0] = convexLensComponent;
 
     // concave lens
     OpticalComponent concaveLensComponent = createConcaveLens(vec3(-2.,0.,-5.), radius);
-    opticalComponents.at[1] = concaveLensComponent;
+    opticalComponents.at[0] = concaveLensComponent;
+
+    // convex lens
+    OpticalComponent convexLensComponent = createConvexLens(vec3(0.,0.,-5.), radius);
+    opticalComponents.at[1] = convexLensComponent;
+
 
     opticalComponents.size = 2;
 }
@@ -314,8 +321,9 @@ void initialize(inout vec3 color, inout vec3 cameraOrigin, inout vec3 cameraDir)
     cameraDir *= rotateX(-uCameraDirection.y);
 
     // initialize the optical components and lines
-    initializeLines();
+    // order matters here
     initializeOpticalComponents();
+    initializeLines();
 }
 
 void main(void) {
