@@ -32,13 +32,15 @@ Sphere exampleSphere = Sphere(vec3(0.6,0.,-5.), vec3(1.,0.,0.), 1.); Sphere exam
 
 // a convex lens is twos spheres intersecting 
 // a concave lens is a box subtracted from two spheres
-struct LensProperties { float focalLength, thickness, angle; vec3 coordinate; };
-struct ConvexLens { Sphere sphere1, sphere2; LensProperties properties; }; 
-struct ConcaveLens { Sphere sphere1, sphere2; Box box; LensProperties properties; };
-struct OpticalComponent { ConvexLens convexLens; ConcaveLens concaveLens; bool isConvex; };
+#define CONVEX_FOCAL_LENGTH 0.2;
+#define CONCAVE_FOCAL_LENGTH -0.2;
+//struct LensProperties { float focalLength, thickness, angle; vec3 coordinate; };
+struct ConvexLens { Sphere sphere1, sphere2; }; 
+struct ConcaveLens { Sphere sphere1, sphere2; Box box; };
+struct OpticalComponent { ConvexLens convexLens; ConcaveLens concaveLens; bool isConvex; float thickness, angle; };
 struct OpticalComponents { OpticalComponent at[OPTICAL_COMPONENTS_SIZE]; int size; };
-ConvexLens nullConvexLens = ConvexLens(Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), LensProperties(0., 0., 0., vec3(0.,0.,0.)));
-ConcaveLens nullConcaveLens = ConcaveLens(Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), Box(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), LensProperties(0., 0., 0., vec3(0.,0.,0.)));
+ConvexLens nullConvexLens = ConvexLens(Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.));
+ConcaveLens nullConcaveLens = ConcaveLens(Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), Box(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.));
 
 OpticalComponents opticalComponents;
 uniform Lines lines;
@@ -113,9 +115,8 @@ OpticalComponent createConcaveLens(vec3 coordinate, float unadjustedThickness) {
     Box box = Box(coordinate, vec3(1.,0.,0.), rbox);
     sphere3.center += coordinate; sphere4.center += coordinate;
     sphere3.center.x += xOffset; sphere4.center.x -= xOffset;
-    LensProperties properties2 = LensProperties(1., rbox, 0.5, coordinate);
-    ConcaveLens concaveLens = ConcaveLens(sphere3, sphere4, box, properties2);
-    return OpticalComponent(nullConvexLens, concaveLens, false);
+    ConcaveLens concaveLens = ConcaveLens(sphere3, sphere4, box);
+    return OpticalComponent(nullConvexLens, concaveLens, false, thickness, 0.);
 }
 
 OpticalComponent createConvexLens(vec3 coordinate, float unadjustedThickness) {
@@ -128,9 +129,8 @@ OpticalComponent createConvexLens(vec3 coordinate, float unadjustedThickness) {
     Sphere sphere1 = SphereWithRadius(radius); Sphere sphere2 = SphereWithRadius(radius);
     sphere1.center.x += xOffset; sphere2.center.x -= xOffset;
     sphere1.center += coordinate; sphere2.center += coordinate;
-    LensProperties properties = LensProperties(1., 0.5, 0.5, vec3(0.,0.,-5.5));
-    ConvexLens convexLens = ConvexLens(sphere1, sphere2, properties);
-    OpticalComponent convexLensComponent = OpticalComponent(convexLens, nullConcaveLens, true);
+    ConvexLens convexLens = ConvexLens(sphere1, sphere2);
+    OpticalComponent convexLensComponent = OpticalComponent(convexLens, nullConcaveLens, true, thickness, 0.);
     return convexLensComponent;
 }
 
