@@ -32,17 +32,19 @@ Sphere exampleSphere = Sphere(vec3(0.6,0.,-5.), vec3(1.,0.,0.), 1.); Sphere exam
 
 // a convex lens is twos spheres intersecting 
 // a concave lens is a box subtracted from two spheres
-#define CONVEX_FOCAL_LENGTH 0.2;
-#define CONCAVE_FOCAL_LENGTH -0.2;
+float CONVEX_FOCAL_LENGTH = 0.2;
+float CONCAVE_FOCAL_LENGTH = -0.2;
 //struct LensProperties { float focalLength, thickness, angle; vec3 coordinate; };
 struct ConvexLens { Sphere sphere1, sphere2; }; 
 struct ConcaveLens { Sphere sphere1, sphere2; Box box; };
-struct OpticalComponent { ConvexLens convexLens; ConcaveLens concaveLens; bool isConvex; float thickness, angle; };
+// struct OpticalComponent { ConvexLens convexLens; ConcaveLens concaveLens; bool isConvex; float thickness, angle; };
+struct OpticalComponent { ConvexLens convexLens; ConcaveLens concaveLens; bool isConvex, isTransitioning; float thickness, angle, focalLength; };
 struct OpticalComponents { OpticalComponent at[OPTICAL_COMPONENTS_SIZE]; int size; };
 ConvexLens nullConvexLens = ConvexLens(Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.));
 ConcaveLens nullConcaveLens = ConcaveLens(Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), Sphere(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.), Box(vec3(0.,0.,0.), vec3(0.,0.,0.), 0.));
 
 OpticalComponents opticalComponents;
+uniform float focalLengths[10];
 uniform Lines lines;
 
 // ====================================================================
@@ -99,6 +101,10 @@ Sphere SphereWithRadius(float radius) {
     return Sphere(vec3(0.,0.,0.), vec3(1.,1.,1.), radius);
 }
 
+bool isTransitioning(float focalLength) {
+    return (focalLength != CONVEX_FOCAL_LENGTH && focalLength != CONCAVE_FOCAL_LENGTH);
+}
+
 ConcaveLens createConcaveLensObject(vec3 coordinate, float unadjustedThickness) {
     float thickness = unadjustedThickness - 0.15; // now thickness from convex and concave lens are the same by scale
     float rbox = thickness; 
@@ -137,14 +143,15 @@ OpticalComponent createConcaveLens(vec3 coordinate, float unadjustedThickness) {
     float thickness = unadjustedThickness - 0.15; // now thickness from convex and concave lens are the same by scale
     ConcaveLens concaveLens = createConcaveLensObject(coordinate, unadjustedThickness);
     ConvexLens convexLens = createConvexLensObject(coordinate, unadjustedThickness);
-    return OpticalComponent(convexLens, concaveLens, false, thickness, 0.);
+    OpticalComponent component = OpticalComponent(convexLens, concaveLens, false, true, thickness, 0., 0.2);
+    return component;
 }
 
 OpticalComponent createConvexLens(vec3 coordinate, float unadjustedThickness) {
     float thickness = unadjustedThickness; // we are using the convex len's thickness as the ground truth
     ConvexLens convexLens = createConvexLensObject(coordinate, unadjustedThickness);
     ConcaveLens concaveLens = createConcaveLensObject(coordinate, unadjustedThickness);
-    OpticalComponent convexLensComponent = OpticalComponent(convexLens, concaveLens, true, thickness, 0.);
+    OpticalComponent convexLensComponent = OpticalComponent(convexLens, concaveLens, true, false, thickness, 0., 0.2);
     return convexLensComponent;
 }
 
@@ -206,7 +213,7 @@ RayMarchHit sdfConcaveLens(vec3 p, ConcaveLens lens) {
     return RayMarchHit(d, lens.sphere1.color);
 }
 
-RayMarchHit sdfLensBlendTest(vec3 p, OpticalComponent opticalComponent) {
+RayMarchHit sdfBlend(vec3 p, OpticalComponent opticalComponent) {
     RayMarchHit caveHit = sdfConcaveLens(p, opticalComponent.concaveLens);
     RayMarchHit vecHit = sdfConvexLens(p, opticalComponent.convexLens);
     RayMarchHit initial, final;
@@ -214,10 +221,14 @@ RayMarchHit sdfLensBlendTest(vec3 p, OpticalComponent opticalComponent) {
     else { initial = caveHit; final = vecHit; }
     float mixFactor = sin(uTime / 2.) * 0.5 + 0.5;
     float d = mix(initial.distance, final.distance, mixFactor);
-    if (mixFactor == 1.) { 
-        // at this point, complete the blend and don't do it anymore.
-    }
     return RayMarchHit(d, initial.colorOfObject);
+}
+
+// MARK: right now, we allow transition for all optical components. Just for now.
+RayMarchHit sdfOpticalComponent(vec3 p, OpticalComponent opticalComponent) {
+    if (isTransitioning(focalLengths[0])) return sdfBlend(p, opticalComponent);
+    if (opticalComponent.isConvex) return sdfConvexLens(p, opticalComponent.convexLens);
+    return sdfConcaveLens(p, opticalComponent.concaveLens);
 }
 
 // sdf of all the optical components and lines
@@ -229,9 +240,7 @@ RayMarchHit sdfScene(vec3 p) {
         if (i >= opticalComponents.size) break;
 
         OpticalComponent component = opticalComponents.at[i];
-        // if (component.isConvex) rayMarchHit = sdfConvexLens(p, component.convexLens);
-        // else rayMarchHit = sdfConcaveLens(p, component.concaveLens);
-        rayMarchHit = sdfLensBlendTest(p, component);
+        rayMarchHit = sdfOpticalComponent(p, component);
         color = ReturnSecondIfXltEdge(rayMarchHit.distance, d, rayMarchHit.colorOfObject, color);
         d = min(d, rayMarchHit.distance);
     }
@@ -367,7 +376,6 @@ void main(void) {
         vec3 intersectionPoint = cameraOrigin + cameraDir * dstToScene;
         color = getColor(intersectionPoint) * rayMarchHit.colorOfObject;
     }
-
 
     gl_FragColor = vec4(color, 1.0);
 }

@@ -29,7 +29,7 @@ function driverScript() {
 
     let uLineSize = gl.getUniformLocation(gl.program, "lines.size");
     initializeLines(gl);
-
+    initializeOpticalComponents(gl);
 
 
     // ANIMATE AND RENDER EACH ANIMATION FRAME
