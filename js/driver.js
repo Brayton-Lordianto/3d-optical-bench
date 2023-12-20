@@ -35,15 +35,16 @@ function driverScript() {
     // ANIMATE AND RENDER EACH ANIMATION FRAME
 
     // SET ALL UNIFORM VARIABLES
+    addLine([-3,0,-5], [0,3,-5], [1,0,0], gl, structs);
+    addLine([0,3,-5], [0,0,-5], [1,0,0], gl, structs);
+    addLine([0,0,-5], [3,0,-5], [1,0,0], gl, structs);
+    
     let startTime = Date.now() / 1000;
     setInterval(() => {
         gl.uniform3fv(uCamera, camera);
         gl.uniform3fv(uCameraDirection, cameraDirection);
     });
     setInterval(() => {
-        addLine([-3,0,-5], [0,3,-5], [1,0,0], gl, structs);
-        addLine([0,3,-5], [0,0,-5], [1,0,0], gl, structs);
-        addLine([0,0,-5], [3,0,-5], [1,0,0], gl, structs);
 
         gl.uniform1f(uTime, Date.now() / 1000 - startTime);
         gl.uniform3fv(uCursor, cursor);

@@ -99,8 +99,7 @@ Sphere SphereWithRadius(float radius) {
     return Sphere(vec3(0.,0.,0.), vec3(1.,1.,1.), radius);
 }
 
-// TODO: calculations
-OpticalComponent createConcaveLens(vec3 coordinate, float unadjustedThickness) {
+ConcaveLens createConcaveLensObject(vec3 coordinate, float unadjustedThickness) {
     float thickness = unadjustedThickness - 0.15; // now thickness from convex and concave lens are the same by scale
     float rbox = thickness; 
     float a = (sqrt(3.) / 4.) * rbox;
@@ -116,10 +115,10 @@ OpticalComponent createConcaveLens(vec3 coordinate, float unadjustedThickness) {
     sphere3.center += coordinate; sphere4.center += coordinate;
     sphere3.center.x += xOffset; sphere4.center.x -= xOffset;
     ConcaveLens concaveLens = ConcaveLens(sphere3, sphere4, box);
-    return OpticalComponent(nullConvexLens, concaveLens, false, thickness, 0.);
+    return concaveLens;
 }
 
-OpticalComponent createConvexLens(vec3 coordinate, float unadjustedThickness) {
+ConvexLens createConvexLensObject(vec3 coordinate, float unadjustedThickness) {
     // if thickness <= 0.5, give thickness - 1, else give .4. Done through experimentation. if you increase this, the lens will be more concave but also smaller (as long as within bounds of thickness)
     // float xOffset = ReturnSecondIfXltEdge(0.51, thickness, thickness - .08, 0.4); // DEPRECATED
     float thickness = unadjustedThickness; // we are using the convex len's thickness as the ground truth
@@ -130,7 +129,22 @@ OpticalComponent createConvexLens(vec3 coordinate, float unadjustedThickness) {
     sphere1.center.x += xOffset; sphere2.center.x -= xOffset;
     sphere1.center += coordinate; sphere2.center += coordinate;
     ConvexLens convexLens = ConvexLens(sphere1, sphere2);
-    OpticalComponent convexLensComponent = OpticalComponent(convexLens, nullConcaveLens, true, thickness, 0.);
+    return convexLens;
+}
+
+// TODO: calculations
+OpticalComponent createConcaveLens(vec3 coordinate, float unadjustedThickness) {
+    float thickness = unadjustedThickness - 0.15; // now thickness from convex and concave lens are the same by scale
+    ConcaveLens concaveLens = createConcaveLensObject(coordinate, unadjustedThickness);
+    ConvexLens convexLens = createConvexLensObject(coordinate, unadjustedThickness);
+    return OpticalComponent(convexLens, concaveLens, false, thickness, 0.);
+}
+
+OpticalComponent createConvexLens(vec3 coordinate, float unadjustedThickness) {
+    float thickness = unadjustedThickness; // we are using the convex len's thickness as the ground truth
+    ConvexLens convexLens = createConvexLensObject(coordinate, unadjustedThickness);
+    ConcaveLens concaveLens = createConcaveLensObject(coordinate, unadjustedThickness);
+    OpticalComponent convexLensComponent = OpticalComponent(convexLens, concaveLens, true, thickness, 0.);
     return convexLensComponent;
 }
 
@@ -192,6 +206,20 @@ RayMarchHit sdfConcaveLens(vec3 p, ConcaveLens lens) {
     return RayMarchHit(d, lens.sphere1.color);
 }
 
+RayMarchHit sdfLensBlendTest(vec3 p, OpticalComponent opticalComponent) {
+    RayMarchHit caveHit = sdfConcaveLens(p, opticalComponent.concaveLens);
+    RayMarchHit vecHit = sdfConvexLens(p, opticalComponent.convexLens);
+    RayMarchHit initial, final;
+    if (opticalComponent.isConvex) { initial = vecHit; final = caveHit; } 
+    else { initial = caveHit; final = vecHit; }
+    float mixFactor = sin(uTime / 2.) * 0.5 + 0.5;
+    float d = mix(initial.distance, final.distance, mixFactor);
+    if (mixFactor == 1.) { 
+        // at this point, complete the blend and don't do it anymore.
+    }
+    return RayMarchHit(d, initial.colorOfObject);
+}
+
 // sdf of all the optical components and lines
 RayMarchHit sdfScene(vec3 p) {
     float d = getHeightOfPlane();
@@ -201,8 +229,9 @@ RayMarchHit sdfScene(vec3 p) {
         if (i >= opticalComponents.size) break;
 
         OpticalComponent component = opticalComponents.at[i];
-        if (component.isConvex) rayMarchHit = sdfConvexLens(p, component.convexLens);
-        else rayMarchHit = sdfConcaveLens(p, component.concaveLens);
+        // if (component.isConvex) rayMarchHit = sdfConvexLens(p, component.convexLens);
+        // else rayMarchHit = sdfConcaveLens(p, component.concaveLens);
+        rayMarchHit = sdfLensBlendTest(p, component);
         color = ReturnSecondIfXltEdge(rayMarchHit.distance, d, rayMarchHit.colorOfObject, color);
         d = min(d, rayMarchHit.distance);
     }
@@ -218,6 +247,8 @@ RayMarchHit sdfScene(vec3 p) {
 }
 
 float sdfSceneDistance(vec3 p) { return sdfScene(p).distance; }
+
+
 
 RayMarchHit rayMarch(vec3 rayOrigin, vec3 rayDir) {
     float accDstToScene = 0.; 
