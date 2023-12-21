@@ -48,7 +48,7 @@ uniform float focalLengths[10];
 uniform Lines lines;
 
 // in a desparate effort to reach the deadline, I will hard code a LOT 
-uniform float uSizeOffset1, uSizeOffset2; 
+uniform float uSizeOffset1, uSizeOffset2, secondIsConcave; 
 
 // ====================================================================
 // MATHEMATICAL UTILITIES
@@ -221,7 +221,7 @@ RayMarchHit sdfConcaveLens(vec3 p, ConcaveLens lens) {
     if (d == boxDist) return RayMarchHit(d, lens.box.color);
     if (d == -sphere1Dist) return RayMarchHit(d, lens.sphere1.color);
     if (d == -sphere2Dist) return RayMarchHit(d, lens.sphere2.color);
-    return RayMarchHit(d, lens.sphere1.color);
+    return RayMarchHit(d, vec3(1.,1.,1.));
 }
 
 RayMarchHit sdfBlend(vec3 p, OpticalComponent opticalComponent, float focalLength) {
@@ -229,19 +229,21 @@ RayMarchHit sdfBlend(vec3 p, OpticalComponent opticalComponent, float focalLengt
     RayMarchHit vecHit = sdfConvexLens(p, opticalComponent.convexLens);
     RayMarchHit initial, final;
     // the mixFactor goes from 0 to 1, following focalLength from CONCAVE_FOCAL_LENGTH to CONVEX_FOCAL_LENGTH
-    float mixFactor;
+    float mixFactor = secondIsConcave / 2. + 0.5;
     if (opticalComponent.isConvex) { initial = vecHit; final = caveHit; 
         mixFactor = abs(focalLength - CONCAVE_FOCAL_LENGTH) / abs(CONVEX_FOCAL_LENGTH - CONCAVE_FOCAL_LENGTH);} 
     else { initial = caveHit; final = vecHit;
         mixFactor = abs(focalLength - CONVEX_FOCAL_LENGTH) / abs(CONCAVE_FOCAL_LENGTH - CONVEX_FOCAL_LENGTH); }
-    // float mixFactor = sin(uTime / 2.) * 0.5 + 0.5;
+    // mixFactor = sin(uTime / 2.) * 0.5 + 0.5;
+    mixFactor = secondIsConcave / 2. + 0.5;
     float d = mix(initial.distance, final.distance, mixFactor);
     return RayMarchHit(d, initial.colorOfObject);
 }
 
 // MARK: right now, we allow transition for all optical components. Just for now.
 RayMarchHit sdfOpticalComponent(vec3 p, OpticalComponent opticalComponent, float focalLength) {
-    if (isTransitioning(focalLength)) return sdfBlend(p, opticalComponent, focalLength);
+    
+    return sdfBlend(p, opticalComponent, focalLength);
     if (isConvex(focalLength)) return sdfConvexLens(p, opticalComponent.convexLens);
     return sdfConcaveLens(p, opticalComponent.concaveLens);
 }
@@ -251,15 +253,21 @@ RayMarchHit sdfScene(vec3 p) {
     float d = getHeightOfPlane();
     vec3 color = vec3(1.,1.,1.);
     RayMarchHit rayMarchHit;
-    for (int i = 0; i < OPTICAL_COMPONENTS_SIZE; i++) {
-        if (i >= opticalComponents.size) break;
+    // for (int i = 0; i < OPTICAL_COMPONENTS_SIZE; i++) {
+    //     if (i >= opticalComponents.size) break;
 
-        float focalLength = focalLengths[i];
-        OpticalComponent component = opticalComponents.at[i];
-        rayMarchHit = sdfOpticalComponent(p, component, focalLength);
-        color = ReturnSecondIfXltEdge(rayMarchHit.distance, d, rayMarchHit.colorOfObject, color);
-        d = min(d, rayMarchHit.distance);
-    }
+    //     float focalLength = focalLengths[i];
+    //     OpticalComponent component = opticalComponents.at[i];
+    //     rayMarchHit = sdfOpticalComponent(p, component, focalLength);
+    //     // color = ReturnSecondIfXltEdge(rayMarchHit.distance, d, rayMarchHit.colorOfObject, color);
+    //     d = min(d, rayMarchHit.distance);
+    // }
+    // 0th index use blend 
+    rayMarchHit = sdfBlend(p, opticalComponents.at[0], focalLengths[0]);
+    d = min(d, rayMarchHit.distance);
+    // 1st index use concave
+    rayMarchHit = sdfConvexLens(p, opticalComponents.at[1].convexLens);
+    d = min(d, rayMarchHit.distance);
     for (int i = 0; i < LINES_SIZE; i++) {
         if (i >= lines.size) break;
 
@@ -268,7 +276,7 @@ RayMarchHit sdfScene(vec3 p) {
         color = ReturnSecondIfXltEdge(rayMarchHit.distance, d, rayMarchHit.colorOfObject, color);
         d = min(d, rayMarchHit.distance);
     }
-    return RayMarchHit(d, color);
+    return RayMarchHit(d, vec3(0.18, 0.58, 0.71));
 }
 
 float sdfSceneDistance(vec3 p) { return sdfScene(p).distance; }
@@ -277,14 +285,15 @@ float sdfSceneDistance(vec3 p) { return sdfScene(p).distance; }
 
 RayMarchHit rayMarch(vec3 rayOrigin, vec3 rayDir) {
     float accDstToScene = 0.; 
+    vec3 color = vec3(1.,1.,1.);
     for (int i = 0; i<MAX_STEPS; i++) {
         vec3 pointOnSphereCast = rayOrigin + rayDir * accDstToScene;
         RayMarchHit rayMarchHit = sdfScene(pointOnSphereCast);
         float currDstToScene = rayMarchHit.distance;
         accDstToScene += currDstToScene;
-        if (accDstToScene > MAX_DIST || currDstToScene < MIN_DIST) break; 
+        if (accDstToScene > MAX_DIST || currDstToScene < MIN_DIST) { color = rayMarchHit.colorOfObject; break; } 
     }
-    return RayMarchHit(accDstToScene, vec3(0.82, 0.09, 0.09));
+    return RayMarchHit(accDstToScene, color);
 }
 
 float rayMarchDistance(vec3 rayOrigin, vec3 rayDir) {
