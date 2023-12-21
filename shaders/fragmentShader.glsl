@@ -47,6 +47,9 @@ OpticalComponents opticalComponents;
 uniform float focalLengths[10];
 uniform Lines lines;
 
+// in a desparate effort to reach the deadline, I will hard code a LOT 
+uniform float uSizeOffset1, uSizeOffset2; 
+
 // ====================================================================
 // MATHEMATICAL UTILITIES
 // ====================================================================
@@ -354,13 +357,13 @@ void initializeOpticalComponents() {
     float radius = .6;
 
     // concave lens
-    OpticalComponent concaveLensComponent = createConcaveLens(vec3(-2.,0.,-5.), radius);
-    opticalComponents.at[0] = concaveLensComponent;
+    OpticalComponent concaveLensComponent = createConcaveLens(vec3(-2.,0.,-5.), radius + uSizeOffset1);
 
     // convex lens
-    OpticalComponent convexLensComponent = createConvexLens(vec3(0.,0.,-5.), radius);
-    opticalComponents.at[1] = convexLensComponent;
+    OpticalComponent convexLensComponent = createConvexLens(vec3(1.,0.,-5.), radius + uSizeOffset2);
 
+    opticalComponents.at[0] = convexLensComponent;
+    opticalComponents.at[1] = concaveLensComponent;
 
     opticalComponents.size = 2;
 }

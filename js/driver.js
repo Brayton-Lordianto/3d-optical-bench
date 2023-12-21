@@ -30,14 +30,16 @@ function driverScript() {
     let uLineSize = gl.getUniformLocation(gl.program, "lines.size");
     initializeLines(gl);
     initializeOpticalComponents(gl);
+    let uSizeOffset1 = gl.getUniformLocation(gl.program, "uSizeOffset1");
 
 
     // ANIMATE AND RENDER EACH ANIMATION FRAME
 
     // SET ALL UNIFORM VARIABLES
-    addLine([-3,0,-5], [0,3,-5], [1,0,0], gl, structs);
-    addLine([0,3,-5], [0,0,-5], [1,0,0], gl, structs);
-    addLine([0,0,-5], [3,0,-5], [1,0,0], gl, structs);
+    var xMax = 10, yMax = 10;
+    var xLens1 = -2, xLens2 = 1; 
+    var xLineS = -5; 
+    
     
     let startTime = Date.now() / 1000;
     setInterval(() => {
@@ -45,6 +47,19 @@ function driverScript() {
         gl.uniform3fv(uCameraDirection, cameraDirection);
     });
     setInterval(() => {
+        clearLines();
+        var a1 = 0.1 + lens1L.value * 0.03; 
+        var yLine1 = (a1-0.1) + 0.35;
+        var linepoints = [
+            [xLineS,0,-5],[xLens1,yLine1,-5],
+            [xLens2,0.2,-5],
+            [3,0.5,-5],
+        ]    
+        for (var i = 0; i < linepoints.length - 1; i+=1) {
+            console.log(yLine1)
+            addLine(linepoints[i], linepoints[i+1], [1,0,0], gl, structs);
+        }
+        gl.uniform1f(uSizeOffset1, 0.04 * lens1L.value);
 
         gl.uniform1f(uTime, Date.now() / 1000 - startTime);
         gl.uniform3fv(uCursor, cursor);
