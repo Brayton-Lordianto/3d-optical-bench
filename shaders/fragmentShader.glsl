@@ -105,6 +105,14 @@ bool isTransitioning(float focalLength) {
     return (focalLength != CONVEX_FOCAL_LENGTH && focalLength != CONCAVE_FOCAL_LENGTH);
 }
 
+bool isConvex(float focalLength) {
+    return focalLength == CONVEX_FOCAL_LENGTH;
+}
+
+bool isConcave(float focalLength) {
+    return focalLength == CONCAVE_FOCAL_LENGTH;
+}
+
 ConcaveLens createConcaveLensObject(vec3 coordinate, float unadjustedThickness) {
     float thickness = unadjustedThickness - 0.15; // now thickness from convex and concave lens are the same by scale
     float rbox = thickness; 
@@ -213,21 +221,25 @@ RayMarchHit sdfConcaveLens(vec3 p, ConcaveLens lens) {
     return RayMarchHit(d, lens.sphere1.color);
 }
 
-RayMarchHit sdfBlend(vec3 p, OpticalComponent opticalComponent) {
+RayMarchHit sdfBlend(vec3 p, OpticalComponent opticalComponent, float focalLength) {
     RayMarchHit caveHit = sdfConcaveLens(p, opticalComponent.concaveLens);
     RayMarchHit vecHit = sdfConvexLens(p, opticalComponent.convexLens);
     RayMarchHit initial, final;
-    if (opticalComponent.isConvex) { initial = vecHit; final = caveHit; } 
-    else { initial = caveHit; final = vecHit; }
-    float mixFactor = sin(uTime / 2.) * 0.5 + 0.5;
+    // the mixFactor goes from 0 to 1, following focalLength from CONCAVE_FOCAL_LENGTH to CONVEX_FOCAL_LENGTH
+    float mixFactor;
+    if (opticalComponent.isConvex) { initial = vecHit; final = caveHit; 
+        mixFactor = abs(focalLength - CONCAVE_FOCAL_LENGTH) / abs(CONVEX_FOCAL_LENGTH - CONCAVE_FOCAL_LENGTH);} 
+    else { initial = caveHit; final = vecHit;
+        mixFactor = abs(focalLength - CONVEX_FOCAL_LENGTH) / abs(CONCAVE_FOCAL_LENGTH - CONVEX_FOCAL_LENGTH); }
+    // float mixFactor = sin(uTime / 2.) * 0.5 + 0.5;
     float d = mix(initial.distance, final.distance, mixFactor);
     return RayMarchHit(d, initial.colorOfObject);
 }
 
 // MARK: right now, we allow transition for all optical components. Just for now.
-RayMarchHit sdfOpticalComponent(vec3 p, OpticalComponent opticalComponent) {
-    if (isTransitioning(focalLengths[0])) return sdfBlend(p, opticalComponent);
-    if (opticalComponent.isConvex) return sdfConvexLens(p, opticalComponent.convexLens);
+RayMarchHit sdfOpticalComponent(vec3 p, OpticalComponent opticalComponent, float focalLength) {
+    if (isTransitioning(focalLength)) return sdfBlend(p, opticalComponent, focalLength);
+    if (isConvex(focalLength)) return sdfConvexLens(p, opticalComponent.convexLens);
     return sdfConcaveLens(p, opticalComponent.concaveLens);
 }
 
@@ -239,8 +251,9 @@ RayMarchHit sdfScene(vec3 p) {
     for (int i = 0; i < OPTICAL_COMPONENTS_SIZE; i++) {
         if (i >= opticalComponents.size) break;
 
+        float focalLength = focalLengths[i];
         OpticalComponent component = opticalComponents.at[i];
-        rayMarchHit = sdfOpticalComponent(p, component);
+        rayMarchHit = sdfOpticalComponent(p, component, focalLength);
         color = ReturnSecondIfXltEdge(rayMarchHit.distance, d, rayMarchHit.colorOfObject, color);
         d = min(d, rayMarchHit.distance);
     }

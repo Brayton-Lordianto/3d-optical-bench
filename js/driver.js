@@ -49,6 +49,7 @@ function driverScript() {
         gl.uniform1f(uTime, Date.now() / 1000 - startTime);
         gl.uniform3fv(uCursor, cursor);
         gl.uniform1f(uFL, 3);
+        makeTransition(0);
 
         // this is the light sources intensity and their directions
         // LC is the color intensity of the light source
